@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WhatsApp Chat Viewer</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #ece5dd; margin: 0; padding: 0; }
+        .chat-container { max-width: 600px; margin: auto; background-color: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0px 2px 8px rgba(0,0,0,0.2); }
+        .header { background-color: #075E54; color: white; padding: 10px; font-size: 18px; font-weight: bold; text-align: center; }
+        .messages { padding: 15px; height: 500px; overflow-y: scroll; display: flex; flex-direction: column; }
+        .message { margin: 8px 0; padding: 10px; border-radius: 8px; max-width: 80%; word-wrap: break-word; }
+        .sent { background-color: #DCF8C6; align-self: flex-end; }
+        .received { background-color: #fff; border: 1px solid #ccc; }
+        .controls { display: flex; padding: 10px; background-color: #f0f0f0; border-top: 1px solid #ccc; }
+        select, button { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+        select { flex: 1; }
+        button { margin-left: 8px; background-color: #075E54; color: white; border: none; cursor: pointer; }
+        .send-box { display: flex; border-top: 1px solid #ccc; padding: 10px; background: #f0f0f0; }
+        .send-box input { flex: 1; padding: 10px; border: none; outline: none; border-radius: 4px; }
+        .send-box button { background: #075E54; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">WhatsApp Chat Viewer</div>
+        <div class="controls">
+            <select id="phoneSelect"></select>
+            <button onclick="loadChat()">Load Chat</button>
+        </div>
+        <div class="messages" id="messages"></div>
+        <div class="send-box">
+            <input id="messageInput" type="text" placeholder="Type a message" />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+<script>
+    let currentPhone = null;
+    let myNumber = "admin"; // Change if you want to simulate different sender
+
+    async function loadPhones() {
+        try {
+            const res = await fetch("/phones");
+            const data = await res.json();
+            const select = document.getElementById("phoneSelect");
+            select.innerHTML = "";
+            data.phones.forEach(phone => {
+                const option = document.createElement("option");
+                option.value = phone;
+                option.textContent = phone;
+                select.appendChild(option);
+            });
+        } catch (err) {
+            console.error("Error loading phones:", err);
+        }
+    }
+
+    async function loadChat() {
+        currentPhone = document.getElementById("phoneSelect").value;
+        const messagesDiv = document.getElementById("messages");
+        messagesDiv.innerHTML = "<p>Loading...</p>";
+        try {
+            const res = await fetch(`/conversations/${currentPhone}`);
+            if (!res.ok) {
+                messagesDiv.innerHTML = `<p style='color:red;'>No conversation found</p>`;
+                return;
+            }
+            const data = await res.json();
+            messagesDiv.innerHTML = "";
+            data.conversation.forEach(msg => {
+                const msgDiv = document.createElement("div");
+                msgDiv.classList.add("message");
+                if (msg.from === currentPhone) {
+                    msgDiv.classList.add("received");
+                } else {
+                    msgDiv.classList.add("sent");
+                }
+                msgDiv.textContent = msg.text?.body || "[Non-text message]";
+                messagesDiv.appendChild(msgDiv);
+            });
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        } catch (err) {
+            messagesDiv.innerHTML = `<p style='color:red;'>Error loading chat</p>`;
+            console.error(err);
+        }
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const messageText = input.value.trim();
+        if (!messageText || !currentPhone) return;
+
+        try {
+            const res = await fetch("/send_message", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    from_number: myNumber,
+                    to_number: currentPhone,
+                    message: messageText
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                const msgDiv = document.createElement("div");
+                msgDiv.classList.add("message", "sent");
+                msgDiv.textContent = messageText;
+                document.getElementById("messages").appendChild(msgDiv);
+                document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+                input.value = "";
+            } else {
+                alert("Error: " + (data.detail || "Unknown"));
+            }
+        } catch (err) {
+            alert("Send failed");
+            console.error("Send failed", err);
+        }
+    }
+
+    window.onload = loadPhones;
+</script>
+</body>
+</html>
