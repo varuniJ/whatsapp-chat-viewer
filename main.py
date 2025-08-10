@@ -1,11 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from db import collection
 from datetime import datetime
 import uuid
 import os, json
 from bson import ObjectId
+from pydantic import BaseModel
+from typing import List
 
 # --------------------------
 # Helper: serialize ObjectId
@@ -23,10 +26,10 @@ def serialize_doc(doc):
 # --------------------------
 app = FastAPI()
 
-# Optional: Enable CORS if API will be called from external frontend
+# Optional CORS if needed
 # app.add_middleware(
 #     CORSMiddleware,
-#     allow_origins=["*"],  # Or specify your frontend URL(s) in production
+#     allow_origins=["*"],
 #     allow_credentials=True,
 #     allow_methods=["*"],
 #     allow_headers=["*"],
@@ -34,14 +37,46 @@ app = FastAPI()
 
 # Serve static frontend
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
-from fastapi.responses import RedirectResponse
 
 @app.get("/")
 def redirect_to_ui():
     return RedirectResponse(url="/static/index.html")
 
 # --------------------------
-# Load sample payloads from folder into MongoDB
+# WebSocket Connection Manager
+# --------------------------
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        data = json.dumps(message)
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(data)
+            except:
+                pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # Not listening to client messages for now
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# --------------------------
+# Load sample payloads into MongoDB
 # --------------------------
 payload_folder = "sample_payloads"
 
@@ -63,11 +98,10 @@ def process_payloads():
             for change in entry_data[0].get("changes", []):
                 value = change.get("value", {})
                 metadata = value.get("metadata", {})
-                business_number = metadata.get("display_phone_number", None)
+                business_number = metadata.get("display_phone_number")
 
                 if "messages" in value:
                     for msg in value["messages"]:
-                        # Add "to" if missing in message payload
                         if "to" not in msg and business_number:
                             msg["to"] = business_number
                         collection.update_one(
@@ -106,23 +140,20 @@ def get_phones():
 
 @app.get("/conversations/{phone}")
 def get_conversation(phone: str):
-    data = list(collection.find(
-        {"$or": [{"from": phone}, {"to": phone}]}
-    ))
+    data = list(collection.find({"$or": [{"from": phone}, {"to": phone}]}))
     if not data:
         raise HTTPException(status_code=404, detail="No conversation found for this number")
     data = serialize_doc(data)
     data.sort(key=lambda x: x.get("timestamp", ""))
     return {"phone": phone, "conversation": data}
 
-from pydantic import BaseModel
 class SendMessageRequest(BaseModel):
     from_number: str
     to_number: str
     message: str
 
 @app.post("/send_message")
-def send_message(req: SendMessageRequest):
+async def send_message(req: SendMessageRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
@@ -136,4 +167,12 @@ def send_message(req: SendMessageRequest):
     }
     inserted = collection.insert_one(new_msg)
     saved_msg = collection.find_one({"_id": inserted.inserted_id})
-    return {"status": "success", "message": serialize_doc(saved_msg)}
+    serialized_msg = serialize_doc(saved_msg)
+
+    # Broadcast to WebSocket clients
+    await manager.broadcast({
+        "event": "new_message",
+        "message": serialized_msg
+    })
+
+    return {"status": "success", "message": serialized_msg}

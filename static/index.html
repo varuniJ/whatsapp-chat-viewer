@@ -1,123 +1,308 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>WhatsApp Chat Viewer</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #ece5dd; margin: 0; padding: 0; }
-        .chat-container { max-width: 600px; margin: auto; background-color: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0px 2px 8px rgba(0,0,0,0.2); }
-        .header { background-color: #075E54; color: white; padding: 10px; font-size: 18px; font-weight: bold; text-align: center; }
-        .messages { padding: 15px; height: 500px; overflow-y: scroll; display: flex; flex-direction: column; }
-        .message { margin: 8px 0; padding: 10px; border-radius: 8px; max-width: 80%; word-wrap: break-word; }
-        .sent { background-color: #DCF8C6; align-self: flex-end; }
-        .received { background-color: #fff; border: 1px solid #ccc; }
-        .controls { display: flex; padding: 10px; background-color: #f0f0f0; border-top: 1px solid #ccc; }
-        select, button { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
-        select { flex: 1; }
-        button { margin-left: 8px; background-color: #075E54; color: white; border: none; cursor: pointer; }
-        .send-box { display: flex; border-top: 1px solid #ccc; padding: 10px; background: #f0f0f0; }
-        .send-box input { flex: 1; padding: 10px; border: none; outline: none; border-radius: 4px; }
-        .send-box button { background: #075E54; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Chat Viewer</title>
+<style>
+body { font-family: Arial, sans-serif; background-color: #ece5dd; margin: 0; padding: 0; height: 100vh; }
+
+.app {
+    display: flex;
+    height: 100vh;
+    max-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 30%;
+    min-width: 220px;
+    background-color: #fff;
+    border-right: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    max-width: 320px;
+}
+.sidebar-header {
+    background-color: #075E54;
+    color: white;
+    padding: 15px;
+    font-weight: bold;
+    font-size: 18px;
+    text-align: center;
+}
+.contact {
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.contact:hover, .contact.active {
+    background-color: #e2f3f5;
+    border-left: 5px solid #25D366;
+}
+
+/* Chat area */
+.chat {
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    background-color: #e5ddd5;
+}
+.chat-header {
+    background-color: #075E54;
+    color: white;
+    padding: 15px;
+    font-weight: bold;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+}
+.back-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 22px;
+    margin-right: 15px;
+    cursor: pointer;
+}
+.chat-header .phone-num {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+}
+.message {
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 8px;
+    max-width: 80%;
+    word-wrap: break-word;
+    font-size: 15px;
+}
+.sent {
+    background-color: #DCF8C6;
+    align-self: flex-end;
+}
+.received {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    align-self: flex-start;
+}
+.send-box {
+    display: flex;
+    padding: 10px;
+    background-color: #f0f0f0;
+}
+.send-box input {
+    flex: 1;
+    padding: 10px;
+    font-size: 15px;
+    border: none;
+    border-radius: 4px;
+    outline: none;
+}
+.send-box button {
+    background-color: #075E54;
+    color: #fff;
+    border: none;
+    padding: 10px 16px;
+    margin-left: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 15px;
+}
+
+/* Mobile view */
+@media screen and (max-width: 768px) {
+    .sidebar {
+        width: 100vw;
+        max-width: 100vw;
+        min-width: 0;
+        position: absolute;
+        left: 0;
+        top: 0;
+        z-index: 10;
+        height: 100vh;
+        transition: left 0.3s;
+    }
+    .chat {
+        width: 100vw;
+        min-width: 0;
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        display: none;
+        flex-direction: column;
+        background-color: #e5ddd5;
+        z-index: 20;
+    }
+    .chat.active {
+        display: flex;
+    }
+    .back-btn {
+        display: inline-block;
+    }
+    .messages {
+        padding-bottom: 80px;
+    }
+    .send-box {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100vw;
+        z-index: 1000;
+        border-radius: 0;
+        padding: 8px;
+    }
+}
+</style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="header">WhatsApp Chat Viewer</div>
-        <div class="controls">
-            <select id="phoneSelect"></select>
-            <button onclick="loadChat()">Load Chat</button>
+<div class="app">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">Chats</div>
+        <div id="contacts"></div>
+    </div>
+
+    <!-- Chat area -->
+    <div class="chat" id="chat">
+        <div class="chat-header">
+            <button class="back-btn" id="backBtn" title="Back to chats">&#8592;</button>
+            <span class="phone-num" id="chatHeader">Select a chat</span>
         </div>
         <div class="messages" id="messages"></div>
         <div class="send-box">
-            <input id="messageInput" type="text" placeholder="Type a message" />
+            <input type="text" id="messageInput" placeholder="Type a message" autocomplete="off" />
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
-
+</div>
 <script>
-    let currentPhone = null;
-    let myNumber = "admin"; // Change if you want to simulate different sender
+let currentPhone = null;
+let myNumber = "admin";
+let ws;
 
-    async function loadPhones() {
-        try {
-            const res = await fetch("/phones");
-            const data = await res.json();
-            const select = document.getElementById("phoneSelect");
-            select.innerHTML = "";
-            data.phones.forEach(phone => {
-                const option = document.createElement("option");
-                option.value = phone;
-                option.textContent = phone;
-                select.appendChild(option);
-            });
-        } catch (err) {
-            console.error("Error loading phones:", err);
-        }
-    }
+// WebSocket for real-time updates
+function connectWebSocket() {
+    let proto = window.location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${window.location.host}/ws`);
 
-    async function loadChat() {
-        currentPhone = document.getElementById("phoneSelect").value;
-        const messagesDiv = document.getElementById("messages");
-        messagesDiv.innerHTML = "<p>Loading...</p>";
-        try {
-            const res = await fetch(`/conversations/${currentPhone}`);
-            if (!res.ok) {
-                messagesDiv.innerHTML = `<p style='color:red;'>No conversation found</p>`;
-                return;
+    ws.onmessage = event => {
+        const data = JSON.parse(event.data);
+        if (data.event === "new_message") {
+            if (data.message.from === currentPhone || data.message.to === currentPhone) {
+                addMessageToUI(data.message);
+                scrollToBottom();
             }
-            const data = await res.json();
-            messagesDiv.innerHTML = "";
-            data.conversation.forEach(msg => {
-                const msgDiv = document.createElement("div");
-                msgDiv.classList.add("message");
-                if (msg.from === currentPhone) {
-                    msgDiv.classList.add("received");
-                } else {
-                    msgDiv.classList.add("sent");
-                }
-                msgDiv.textContent = msg.text?.body || "[Non-text message]";
-                messagesDiv.appendChild(msgDiv);
-            });
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        } catch (err) {
-            messagesDiv.innerHTML = `<p style='color:red;'>Error loading chat</p>`;
-            console.error(err);
         }
+    };
+    ws.onclose = () => setTimeout(connectWebSocket, 2000);
+}
+
+// Auto-scroll to latest
+function scrollToBottom() {
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// Add one message
+function addMessageToUI(msg) {
+    const messagesDiv = document.getElementById("messages");
+    const msgDiv = document.createElement("div");
+    msgDiv.classList.add("message");
+    msgDiv.classList.add(msg.from === currentPhone ? "received" : "sent");
+    msgDiv.textContent = msg.text?.body || "[Non-text message]";
+    messagesDiv.appendChild(msgDiv);
+}
+
+// Load contact list
+async function loadContacts() {
+    const res = await fetch("/phones");
+    const data = await res.json();
+    const contactsDiv = document.getElementById("contacts");
+    contactsDiv.innerHTML = "";
+    data.phones.forEach(phone => {
+        const contactDiv = document.createElement("div");
+        contactDiv.classList.add("contact");
+        contactDiv.textContent = phone;
+        contactDiv.dataset.phone = phone;
+        contactDiv.onclick = () => openChat(phone);
+        contactsDiv.appendChild(contactDiv);
+    });
+}
+
+// Open chat and load messages
+async function openChat(phone) {
+    currentPhone = phone;
+    document.getElementById("chatHeader").textContent = phone;
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv.innerHTML = "Loading...";
+    const res = await fetch(`/conversations/${phone}`);
+    if (!res.ok) {
+        messagesDiv.innerHTML = "<p style='color:red;'>No conversation found</p>";
+        return;
     }
-
-    async function sendMessage() {
-        const input = document.getElementById("messageInput");
-        const messageText = input.value.trim();
-        if (!messageText || !currentPhone) return;
-
-        try {
-            const res = await fetch("/send_message", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    from_number: myNumber,
-                    to_number: currentPhone,
-                    message: messageText
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                const msgDiv = document.createElement("div");
-                msgDiv.classList.add("message", "sent");
-                msgDiv.textContent = messageText;
-                document.getElementById("messages").appendChild(msgDiv);
-                document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
-                input.value = "";
-            } else {
-                alert("Error: " + (data.detail || "Unknown"));
-            }
-        } catch (err) {
-            alert("Send failed");
-            console.error("Send failed", err);
-        }
+    const data = await res.json();
+    messagesDiv.innerHTML = "";
+    data.conversation.forEach(addMessageToUI);
+    scrollToBottom();
+    // Highlight active contact
+    document.querySelectorAll('.contact').forEach(c => {
+        c.classList.toggle('active', c.dataset.phone === phone);
+    });
+    // Mobile: hide sidebar, show chat
+    if (window.innerWidth <= 768) {
+        document.getElementById("sidebar").style.display = "none";
+        document.getElementById("chat").classList.add("active");
     }
+    // Focus input
+    document.getElementById("messageInput").focus();
+}
 
-    window.onload = loadPhones;
+async function sendMessage() {
+    const input = document.getElementById("messageInput");
+    const messageText = input.value.trim();
+    if (!messageText || !currentPhone) return;
+    const res = await fetch("/send_message", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            from_number: myNumber,
+            to_number: currentPhone,
+            message: messageText
+        })
+    });
+    if (res.ok) {
+        input.value = "";
+        input.focus();
+    }
+}
+
+// Mobile: back button to chat list
+document.getElementById("backBtn").onclick = function() {
+    // Hide chat, show sidebar
+    document.getElementById("chat").classList.remove("active");
+    document.getElementById("sidebar").style.display = "flex";
+};
+
+window.onload = function() {
+    loadContacts();
+    connectWebSocket();
+    document.getElementById("messageInput").addEventListener("keypress", function(e) {
+        if (e.key === "Enter") sendMessage();
+    });
+};
 </script>
 </body>
 </html>
